@@ -159,7 +159,7 @@
     .tl-time{flex-basis:70px;font-size:12px}
   }
   @media print{
-    nav.toc,#top{display:none!important}
+    nav.toc,#top,#weather{display:none!important}
     body{background:#fff}
     .day,.card,.tbl-wrap{box-shadow:none;break-inside:avoid}
     section{padding:16px 0}
@@ -184,6 +184,7 @@
 <nav class="toc">
   <div class="scroller">
     <a href="#overview">🗺️ 總覽</a>
+    <a href="#weather">🌦️ 天氣</a>
     <a href="#days">📅 每日行程</a>
     <a href="#flights">✈️ 航班</a>
     <a href="#hotels">🏨 住宿</a>
@@ -210,6 +211,82 @@
       <div class="ov"><div class="d">Day 6 · 7/16 四</div><div class="place">返回台灣</div><div class="desc">四面佛 → 曼谷 ✈ 桃園（長榮 BR202）</div></div>
     </div>
   </section>
+
+  <!-- ===== WEATHER ===== -->
+  <section id="weather">
+    <div class="sec-head"><span class="ic">🌦️</span><h2>即時天氣預報</h2><span class="bar"></span></div>
+    <div class="ov-grid" id="wx-grid">
+      <div class="ov"><div class="desc">天氣載入中…（需要網路連線）</div></div>
+    </div>
+    <p class="note-sm" id="wx-updated">資料來源：Open-Meteo，打開頁面時自動更新。</p>
+    <div class="alert">
+      <div class="h">🌀 颱風動態請以官方為準</div>
+      <p>出發前請留意 <a href="https://www.cwa.gov.tw/V8/C/P/Typhoon/TY_NEWS.html" target="_blank" rel="noopener" style="color:var(--coral);font-weight:700">中央氣象署颱風專區</a> 與航空公司通知；班機異動以泰航／長榮官網及簡訊為準。</p>
+    </div>
+  </section>
+  <script>
+  (function(){
+    var CITIES = [
+      {name:'桃園機場', em:'🛫', lat:25.08, lon:121.23, tz:'Asia/Taipei'},
+      {name:'烏隆他尼', em:'🌴', lat:17.41, lon:102.79, tz:'Asia/Bangkok'},
+      {name:'芭達雅', em:'🏝️', lat:12.93, lon:100.88, tz:'Asia/Bangkok'},
+      {name:'曼谷', em:'🏙️', lat:13.75, lon:100.50, tz:'Asia/Bangkok'}
+    ];
+    function icon(c){
+      if(c===0) return '☀️';
+      if(c<=2) return '🌤️';
+      if(c===3) return '☁️';
+      if(c<=48) return '🌫️';
+      if(c<=57) return '🌦️';
+      if(c<=67) return '🌧️';
+      if(c<=77) return '❄️';
+      if(c<=82) return '🌧️';
+      if(c<=86) return '❄️';
+      return '⛈️';
+    }
+    function fmtDate(s){
+      var d = new Date(s + 'T00:00:00');
+      var w = ['日','一','二','三','四','五','六'][d.getDay()];
+      return (d.getMonth()+1) + '/' + d.getDate() + '(' + w + ')';
+    }
+    var grid = document.getElementById('wx-grid');
+    var stamp = document.getElementById('wx-updated');
+    Promise.all(CITIES.map(function(c){
+      var u = 'https://api.open-meteo.com/v1/forecast?latitude=' + c.lat + '&longitude=' + c.lon
+        + '&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max'
+        + '&forecast_days=7&timezone=' + encodeURIComponent(c.tz);
+      return fetch(u).then(function(r){ return r.json(); }).then(function(j){ return {c:c, j:j}; })
+        .catch(function(){ return {c:c, j:null}; });
+    })).then(function(all){
+      grid.innerHTML = '';
+      all.forEach(function(o){
+        var div = document.createElement('div');
+        div.className = 'ov';
+        if(!o.j || !o.j.daily){
+          div.innerHTML = '<div class="place">' + o.c.em + ' ' + o.c.name + '</div><div class="desc">載入失敗，請稍後重整</div>';
+          grid.appendChild(div); return;
+        }
+        var cur = o.j.current;
+        var d = o.j.daily;
+        var rows = '';
+        for(var i=0;i<d.time.length;i++){
+          rows += '<div style="display:flex;justify-content:space-between;gap:6px;font-size:12.5px;padding:2px 0;border-bottom:1px dashed var(--line)">'
+            + '<span style="flex:0 0 62px">' + fmtDate(d.time[i]) + '</span>'
+            + '<span>' + icon(d.weather_code[i]) + '</span>'
+            + '<span style="flex:0 0 74px;text-align:right">' + Math.round(d.temperature_2m_min[i]) + '–' + Math.round(d.temperature_2m_max[i]) + '°C</span>'
+            + '<span style="flex:0 0 46px;text-align:right;color:#2563a8">💧' + (d.precipitation_probability_max[i]==null?'–':d.precipitation_probability_max[i]) + '%</span>'
+            + '</div>';
+        }
+        div.innerHTML = '<div class="place">' + o.c.em + ' ' + o.c.name
+          + ' <span style="font-size:14px;color:var(--gold-d)">' + (cur ? icon(cur.weather_code) + ' ' + Math.round(cur.temperature_2m) + '°C' : '') + '</span></div>'
+          + rows;
+        grid.appendChild(div);
+      });
+      var n = new Date();
+      stamp.textContent = '資料來源：Open-Meteo｜更新於 ' + n.getFullYear() + '/' + (n.getMonth()+1) + '/' + n.getDate() + ' ' + ('0'+n.getHours()).slice(-2) + ':' + ('0'+n.getMinutes()).slice(-2) + '（打開頁面自動更新，💧為降雨機率）';
+    });
+  })();
+  </script>
 
   <!-- ===== DAYS ===== -->
   <section id="days">
